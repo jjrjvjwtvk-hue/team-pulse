@@ -126,8 +126,12 @@ class FieldDef:
 
 def field_definitions(configuration: dict) -> list[FieldDef]:
     raw = configuration.get("fields") or configuration.get("field_definitions") or []
+    if isinstance(raw, dict):  # live API nests them: {"definitions": [...]}
+        raw = raw.get("definitions") or []
     defs = []
     for f in raw:
+        if str(f.get("type", "")).startswith("builtin_"):
+            continue
         type_data = f.get("type_data") or {}
         options = f.get("choices") or type_data.get("choices") or f.get("options") or type_data.get("options") or []
         name = f.get("name")

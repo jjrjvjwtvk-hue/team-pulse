@@ -237,7 +237,8 @@ Teamup's OpenAPI spec has data models for webhook notifications and an activity 
 - [x] CSV and JSON export
 - [x] `board` report and HTML export
 - [x] Local filters and `groups.yml`
-- [ ] Verify against a live calendar: custom field layout in `configuration`, all-day end times, search paging
+- [x] Verify against a live calendar: credentials, all-day end times, search paging, and the custom field layout (fixed: the API nests fields under `fields.definitions`). This calendar defines no custom fields, so `--field` is untested live
+- [ ] Separate time off from meetings and partial-day entries ("Nothing after 1", "Outdoor Meeting") so `out` and `totals` stop counting them
 - [ ] Weekly digest: a scheduled run that emails or posts "who's out this week"
 - [ ] Time-off balances, if allowances can be stored somewhere
 

@@ -324,3 +324,15 @@ def test_only_calendar_key_is_required(monkeypatch):
     monkeypatch.delenv("TEAMUP_CALENDAR_KEY")
     with pytest.raises(ConfigError, match="TEAMUP_CALENDAR_KEY"):
         load_settings(env_file=None)
+
+
+def test_field_definitions_accepts_live_nested_shape():
+    from team_pulse.filters import field_definitions
+    cfg = {"fields": {"definitions": [
+        {"id": "builtin_title", "type": "builtin_title", "name": ""},
+        {"id": "7", "type": "dropdown", "name": "Kind",
+         "type_data": {"choices": [{"id": 1, "name": "Vacation"}]}},
+    ]}}
+    defs = field_definitions(cfg)
+    assert [d.name for d in defs] == ["Kind"]
+    assert defs[0].choices == {"vacation": "1"}
