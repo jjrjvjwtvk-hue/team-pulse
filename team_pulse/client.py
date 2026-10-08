@@ -25,7 +25,9 @@ class TeamupClient:
         self._sleep = sleep
 
     def _headers(self) -> dict[str, str]:
-        headers = {"Teamup-Token": self.settings.api_key, "Accept": "application/json"}
+        headers = {"Accept": "application/json"}
+        if self.settings.api_key:
+            headers["Teamup-Token"] = self.settings.api_key
         if self.settings.bearer_token:
             headers["Authorization"] = f"Bearer {self.settings.bearer_token}"
         return headers
@@ -108,7 +110,7 @@ def _error_message(resp: requests.Response) -> str:
     except ValueError:
         pass
     hints = {
-        401: "Check TEAMUP_API_KEY.",
+        401: "Check TEAMUP_API_KEY, or the Teamup-Token header on the network secret for api.teamup.com.",
         403: "The key doesn't have permission for this. Check its access level in Teamup.",
         404: "Check TEAMUP_CALENDAR_KEY.",
     }

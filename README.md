@@ -40,11 +40,26 @@ Settings live in `.env` (never committed; it's in `.gitignore`).
 
 | Variable | Required | Description |
 |---|---|---|
-| `TEAMUP_API_KEY` | Yes | Sent with every request in the `Teamup-Token` header |
+| `TEAMUP_API_KEY` | Yes, unless a network secret supplies it | Sent with every request in the `Teamup-Token` header |
 | `TEAMUP_CALENDAR_KEY` | Yes | The calendar key or ID that appears in the API path |
 | `TEAMUP_TIMEZONE` | No | IANA time zone for returned dates, e.g. `America/Chicago`. Defaults to the calendar's own setting |
 | `TEAMUP_BASE_URL` | No | Defaults to `https://api.teamup.com` |
 | `TEAMUP_BEARER_TOKEN` | No | Only needed if your calendar key can't see everything you want. See below |
+
+### Running in a Claude Code cloud session
+
+In a cloud session, keep the API key out of the session entirely by storing it as a network secret. The agent proxy adds the header to requests for `api.teamup.com` after they leave the session, so the key never appears in the environment or any file. Leave `TEAMUP_API_KEY` unset and the tool sends no `Teamup-Token` header of its own.
+
+In the environment's **Edit environment** dialog at claude.ai/code, under **Network secrets**, select **Add secret**:
+
+- **Credential type:** Bearer (the default)
+- **Name:** `Teamup`
+- **Allowed websites:** `api.teamup.com`
+- **Custom headers:** change the header **Name** from `Authorization` to `Teamup-Token`, clear the **Prefix**, and paste the key as the **Value**
+
+`TEAMUP_CALENDAR_KEY` and `TEAMUP_TIMEZONE` aren't secrets the proxy can attach (the calendar key goes in the URL path), so set them as ordinary environment variables in the same dialog. Network secrets are only on Pro and Max plans.
+
+### Key permissions
 
 Use a key with **`read_only`** permission. This tool only reads, so it shouldn't hold a key that can write.
 

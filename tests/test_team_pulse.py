@@ -308,3 +308,19 @@ def test_board_html_details_and_accessibility(capsys):
     # Screen readers get who and when for each strip; the grid can be scrolled by keyboard
     assert '<span class="sr">Alex Example: </span>' in out
     assert 'tabindex="0" role="region"' in out
+
+
+def test_client_omits_token_header_when_network_secret_supplies_it():
+    session = FakeSession([FakeResponse(200, {"subcalendars": []})])
+    TeamupClient(Settings(api_key=None, calendar_key="cal"), session).subcalendars()
+    assert "Teamup-Token" not in session.requests[0][2]
+
+
+def test_only_calendar_key_is_required(monkeypatch):
+    from team_pulse.config import ConfigError, load_settings
+    monkeypatch.delenv("TEAMUP_API_KEY", raising=False)
+    monkeypatch.setenv("TEAMUP_CALENDAR_KEY", "cal")
+    assert load_settings(env_file=None).api_key is None
+    monkeypatch.delenv("TEAMUP_CALENDAR_KEY")
+    with pytest.raises(ConfigError, match="TEAMUP_CALENDAR_KEY"):
+        load_settings(env_file=None)

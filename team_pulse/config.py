@@ -16,7 +16,7 @@ class ConfigError(Exception):
 
 @dataclass(frozen=True)
 class Settings:
-    api_key: str
+    api_key: str | None  # None when a network secret adds the Teamup-Token header outside the VM
     calendar_key: str
     timezone: str | None = None
     base_url: str = DEFAULT_BASE_URL
@@ -33,9 +33,8 @@ def load_settings(env_file: str | None = ".env") -> Settings:
 
     api_key = get("TEAMUP_API_KEY")
     calendar_key = get("TEAMUP_CALENDAR_KEY")
-    missing = [n for n, v in (("TEAMUP_API_KEY", api_key), ("TEAMUP_CALENDAR_KEY", calendar_key)) if not v]
-    if missing:
-        raise ConfigError(f"Missing required setting(s): {', '.join(missing)}. Copy .env.example to .env and fill it in.")
+    if not calendar_key:
+        raise ConfigError("Missing TEAMUP_CALENDAR_KEY. Copy .env.example to .env and fill it in.")
 
     return Settings(
         api_key=api_key,
