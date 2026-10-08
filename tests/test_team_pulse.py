@@ -346,3 +346,44 @@ def test_title_pattern_matches_whole_words_only():
     for no in ["Nothing after 1", "Outdoor Meeting", "Offsite", "1 Lead only"]:
         assert not p.search(no), no
     assert title_pattern(["sick"]).search("Sick day") and not title_pattern(["sick"]).search("OFF")
+
+
+def _blocks_ctx(names, start, end):
+    from team_pulse.reports import Context
+    return Context(start=start, end=end, subcalendar_names={i + 1: n for i, n in enumerate(names)},
+                   selected_ids=[], member_names=list(names))
+
+
+def _ev(sub, start, end, all_day=False, title="OFF"):
+    return Event.from_api({"id": "x", "title": title, "start_dt": start, "end_dt": end,
+                           "all_day": all_day, "subcalendar_ids": [sub]})
+
+
+def test_block_fractions_partial_overlap_and_merge():
+    from team_pulse.blocks import person_block_fractions
+    ctx = _blocks_ctx(["Bath > A"], date(2026, 10, 12), date(2026, 10, 12))  # Monday
+    # 11:00-13:30 covers 90 of B1's 210 min and 60 of B2's; the second event overlaps and must not double count
+    events = [_ev(1, "2026-10-12T11:00:00", "2026-10-12T13:30:00"), _ev(1, "2026-10-12T12:00:00", "2026-10-12T13:00:00")]
+    f = person_block_fractions(events, ctx)
+    assert f[("Bath > A", date(2026, 10, 12), "B1")] == pytest.approx(90 / 210)
+    assert f[("Bath > A", date(2026, 10, 12), "B2")] == pytest.approx(60 / 210)
+    assert ("Bath > A", date(2026, 10, 12), "B3") not in f
+
+
+def test_block_saturday_has_two_blocks_and_sunday_none():
+    from team_pulse.blocks import person_block_fractions
+    ctx = _blocks_ctx(["Bath > A"], date(2026, 10, 10), date(2026, 10, 11))
+    f = person_block_fractions([_ev(1, "2026-10-10", "2026-10-12", all_day=True)], ctx)
+    assert sorted(k[2] for k in f if k[1] == date(2026, 10, 10)) == ["B1", "B2"]
+    assert not [k for k in f if k[1] == date(2026, 10, 11)]
+
+
+def test_group_blocks_report_percent_and_threshold():
+    from team_pulse.blocks import group_blocks_report
+    names = ["Bath > A", "Bath > B", "Out > C"]
+    ctx = _blocks_ctx(names, date(2026, 10, 12), date(2026, 10, 12))
+    events = [_ev(1, "2026-10-12", "2026-10-13", all_day=True)]
+    rep = group_blocks_report(events, ctx, threshold=40)
+    assert rep.rows[0][2:] == ["Bath", "B1", "09:00-12:30", 2, 1, 50.0, 50.0, "OVER"]
+    assert len(rep.rows) == 3 and all(r[2] == "Bath" for r in rep.rows)
+    assert group_blocks_report(events, ctx, threshold=60).rows[0][-1] == ""

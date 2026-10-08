@@ -97,6 +97,9 @@ Filters combine. An event has to match all of them to appear.
 | `--search` | `--search "dentist"` | Keyword search, 2 to 100 characters. Teamup runs the search, see [Search syntax](#search-syntax) |
 | `--time-off` | | Only events whose title contains a time-off word: off, sick, pto, vacation, holiday, or leave (whole words, any case). Filters out meetings and "Nothing after 1" entries |
 | `--title-match` | `--title-match sick` | Like `--time-off` with your own words (repeatable). Replaces the default list |
+| `--parent` | `--parent Bathrooms` | Limit to one top-level group, taken from the sub-calendar name (`Bathrooms > Ed Wright` is in `Bathrooms`). Repeatable |
+| `--threshold` | `--threshold 25` | Block reports only: mark rows `OVER` when more than this percentage of the group is off |
+| `--any-title` | | Block reports only: count every event instead of just time-off titles |
 | `--min-days` | `--min-days 3` | Only absences of at least N days |
 | `--include-all-day / --exclude-all-day` | | Limit to all-day or timed events |
 | `--include-weekends` | | Count Saturdays and Sundays as days off. By default only weekdays are counted |
@@ -110,8 +113,33 @@ Filters combine. An event has to match all of them to appear.
 | Coverage | `report coverage` | Headcount out per day, so you can see thin days at a glance |
 | Totals | `report totals` | Days off per person for the range |
 | Overlaps | `report overlaps` | Days when two or more people in the same group are out |
+| Group availability | `report blocks` | For each group, day and time block, the percentage of the group's reps' time that's off, and the percentage still available. See [Time blocks](#time-blocks) |
+| Time off by block | `report people-blocks` | The same, per rep: what percentage of each block they're off |
 | Changes | `report changes --since 7d` | Events created, edited, or deleted since a point in time (`7d`, `24h`, `YYYY-MM-DD`, or `last`, the default, which picks up where the previous run stopped). Teamup only tracks 30 days |
 | Raw | `report raw` | Every matching event, unaggregated |
+
+### Time blocks
+
+The block reports measure time off against the reps' working blocks:
+
+| Days | B1 | B2 | B3 |
+|---|---|---|---|
+| Mon-Fri | 09:00-12:30 | 12:30-16:00 | 16:00-19:30 |
+| Sat | 10:00-12:00 | 12:00-14:00 | |
+
+Sunday has no blocks. Blocks run back to back with no gap, so 12:30 belongs to B2 and the "12:01" start is already covered. The numbers are in `team_pulse/blocks.py`.
+
+- A rep's percentage for a block is the share of the block's minutes covered by their events. An all-day event covers every block that day. Overlapping events for the same rep are merged, so nothing is counted twice.
+- A group's percentage is the average across its reps: two of four reps off for a whole block is 50%. The headcount is every active sub-calendar in the group, or only those you selected with `--who` / `--parent`.
+- Groups come from the sub-calendar name before the ` > `.
+- Block reports count only time-off titles (see `--time-off`) unless you pass `--title-match` or `--any-title`. Otherwise a meeting during a block would count as time off.
+- Only rows with some time off are listed. A day missing from the report means nobody was off.
+- `--threshold` doesn't have a default yet. Without it the `flag` column stays empty.
+
+```bash
+python -m team_pulse report blocks --preset next-30-days --threshold 25
+python -m team_pulse report people-blocks --parent Bathrooms --preset this-week
+```
 
 ### Examples
 
@@ -208,6 +236,7 @@ team-pulse/
 │   ├── models.py        # Event parsing and day splitting
 │   ├── filters.py       # Filter parsing and local filtering
 │   ├── reports.py       # out, coverage, totals, overlaps, changes, raw
+│   ├── blocks.py        # Time blocks and per-block availability percentages
 │   ├── output.py        # table, CSV, JSON writers
 │   ├── html.py          # HTML pages: the board and styled tables
 │   └── cli.py           # Command-line entry point
@@ -241,6 +270,8 @@ Teamup's OpenAPI spec has data models for webhook notifications and an activity 
 - [x] Local filters and `groups.yml`
 - [x] Verify against a live calendar: credentials, all-day end times, search paging, and the custom field layout (fixed: the API nests fields under `fields.definitions`). This calendar defines no custom fields, so `--field` is untested live
 - [x] Separate time off from meetings and partial-day entries with `--time-off` / `--title-match`. It's opt-in, since it depends on how your team titles events
+- [x] Time-block availability by group (`blocks`, `people-blocks`) with a flag threshold
+- [ ] Settle the real threshold, and whether it should differ by group or block
 - [ ] Weekly digest: a scheduled run that emails or posts "who's out this week"
 - [ ] Time-off balances, if allowances can be stored somewhere
 

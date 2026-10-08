@@ -25,6 +25,8 @@ from .filters import (
     resolve_subcalendars,
     title_pattern,
 )
+from . import blocks
+from .blocks import group_of
 from .models import Event
 
 STATE_FILE = Path(".team_pulse_state.json")
@@ -47,6 +49,12 @@ def build_parser() -> argparse.ArgumentParser:
     rep.add_argument("--who", action="append", default=[], help="Person or sub-calendar name (repeatable)")
     rep.add_argument("--group", action="append", default=[], help="Group from groups.yml (repeatable)")
     rep.add_argument("--field", action="append", default=[], metavar="NAME=VALUE", help="Custom field match (repeatable)")
+    rep.add_argument("--parent", action="append", default=[], metavar="NAME",
+                     help="Top-level group from the sub-calendar name, e.g. Bathrooms (repeatable)")
+    rep.add_argument("--threshold", type=float, metavar="PCT",
+                     help="For the block reports: flag any group-block with more than PCT%% of reps' time off")
+    rep.add_argument("--any-title", action="store_true",
+                     help="For the block reports: count every event, not just time-off titles")
     rep.add_argument("--search", help="Keyword search, run by Teamup (2-100 characters)")
     rep.add_argument("--time-off", action="store_true",
                      help="Only events whose title has a time-off word (off, sick, pto, vacation, holiday, leave)")
@@ -152,6 +160,16 @@ def cmd_report(args, client: TeamupClient, tz: str | None, today: date) -> str:
     subcalendars = client.subcalendars()
     selected_ids, who_text = resolve_subcalendars(args.who, args.group, groups, subcalendars)
 
+    if args.parent:
+        wanted = {p.casefold() for p in args.parent}
+        known = {group_of(s["name"]).casefold() for s in subcalendars}
+        missing = [p for p in args.parent if p.casefold() not in known]
+        if missing:
+            raise FilterError(f"Unknown group {missing[0]!r}. Groups: "
+                              + ", ".join(sorted({group_of(s['name']) for s in subcalendars})))
+        in_parents = [int(s["id"]) for s in subcalendars if group_of(s["name"]).casefold() in wanted]
+        selected_ids = [i for i in selected_ids if i in in_parents] if selected_ids else in_parents
+
     field_matches = []
     field_names: dict[str, str] = {}
     if args.field or args.kind == "raw":
@@ -160,7 +178,8 @@ def cmd_report(args, client: TeamupClient, tz: str | None, today: date) -> str:
         field_matches = parse_field_filters(args.field, defs)
 
     title = None
-    if args.title_match or args.time_off:
+    block_report = args.kind in ("blocks", "people-blocks")
+    if args.title_match or args.time_off or (block_report and not args.any_title):
         title = title_pattern(args.title_match or TIME_OFF_WORDS)
 
     local = LocalFilters(
@@ -191,6 +210,8 @@ def cmd_report(args, client: TeamupClient, tz: str | None, today: date) -> str:
         include_weekends=args.include_weekends,
         groups=report_groups,
         field_names=field_names,
+        member_names=[s["name"] for s in subcalendars
+                      if s.get("active", True) and (not selected_ids or int(s["id"]) in selected_ids)],
     )
     people = [ctx.subcalendar_names[i] for i in selected_ids if i in ctx.subcalendar_names]
     heading = reports.HEADINGS[args.kind]
@@ -199,7 +220,12 @@ def cmd_report(args, client: TeamupClient, tz: str | None, today: date) -> str:
             return html.render_board(events, ctx, heading, people, today)
         return output.render(reports.board_report(events, ctx, people, marks=args.format == "table"), args.format)
 
+    if args.kind == "blocks":
+        report = blocks.group_blocks_report(events, ctx, args.threshold)
+        return html.render_table(report, ctx, heading) if args.format == "html" else output.render(report, args.format)
+
     builders = {
+        "people-blocks": blocks.people_blocks_report,
         "out": reports.out_report,
         "coverage": reports.coverage_report,
         "totals": reports.totals_report,

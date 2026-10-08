@@ -8,10 +8,11 @@ from datetime import date, datetime, timedelta
 
 from .models import Event
 
-REPORTS = ("board", "out", "coverage", "totals", "overlaps", "changes", "raw")
+REPORTS = ("board", "out", "coverage", "totals", "overlaps", "changes", "raw", "blocks", "people-blocks")
 HEADINGS = {
     "board": "Who's out", "out": "Who's out", "coverage": "Coverage", "totals": "Days off",
     "overlaps": "Overlaps", "changes": "Calendar changes", "raw": "Events",
+    "blocks": "Group availability by time block", "people-blocks": "Time off by block",
 }
 
 
@@ -30,6 +31,7 @@ class Context:
     include_weekends: bool = False
     groups: dict[str, list[str]] | None = None  # for overlaps
     field_names: dict[str, str] | None = None  # field id -> display name, for raw
+    member_names: list[str] | None = None  # active sub-calendars in scope, for group headcounts
 
     def people(self, event: Event) -> list[str]:
         ids = event.subcalendar_ids
@@ -39,6 +41,10 @@ class Context:
 
     def days_in_range(self, event: Event) -> list[date]:
         return [d for d in event.days(self.include_weekends) if self.start <= d <= self.end]
+
+    def range_days(self, event: Event) -> list[date]:
+        """Every day in range the event touches, weekends included (the block reports work Mon-Sat)."""
+        return [d for d in event.days(True) if self.start <= d <= self.end]
 
     def all_days(self) -> list[date]:
         days, d = [], self.start
