@@ -4,7 +4,7 @@ A small command-line tool for pulling time-off reports out of Teamup, filtered h
 
 My team logs time off in a Teamup calendar. This repo turns that calendar into answers: who's out this week, who's out the same days next month, how much time someone has taken this quarter. Run it with a set of filters, get a report back as a table, CSV, or JSON.
 
-> **Status:** Early development. The commands and options below describe the intended design. Anything not yet built is marked in the [Roadmap](#roadmap).
+> **Status:** Early development. The core commands and reports below are built and tested against a mocked API, but haven't been run against a live calendar yet. What's still to come is in the [Roadmap](#roadmap).
 
 ## What it does
 
@@ -29,6 +29,7 @@ python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
+cp groups.example.yml groups.yml   # optional
 ```
 
 Then fill in `.env`.
@@ -81,6 +82,7 @@ Filters combine. An event has to match all of them to appear.
 | `--search` | `--search "dentist"` | Keyword search, 2 to 100 characters. Teamup runs the search, see [Search syntax](#search-syntax) |
 | `--min-days` | `--min-days 3` | Only absences of at least N days |
 | `--include-all-day / --exclude-all-day` | | Limit to all-day or timed events |
+| `--include-weekends` | | Count Saturdays and Sundays as days off. By default only weekdays are counted |
 
 ### Reports
 
@@ -90,7 +92,7 @@ Filters combine. An event has to match all of them to appear.
 | Coverage | `report coverage` | Headcount out per day, so you can see thin days at a glance |
 | Totals | `report totals` | Days off per person for the range |
 | Overlaps | `report overlaps` | Days when two or more people in the same group are out |
-| Changes | `report changes --since 7d` | Events created, edited, or deleted since a point in time. Teamup only tracks 30 days |
+| Changes | `report changes --since 7d` | Events created, edited, or deleted since a point in time (`7d`, `24h`, `YYYY-MM-DD`, or `last`, the default, which picks up where the previous run stopped). Teamup only tracks 30 days |
 | Raw | `report raw` | Every matching event, unaggregated |
 
 ### Examples
@@ -127,7 +129,7 @@ python -m team_pulse report changes --since 7d
 
 ## Groups
 
-`groups.yml` maps a name to a list of sub-calendars, so you don't retype team rosters.
+`groups.yml` maps a name to a list of sub-calendars, so you don't retype team rosters. It's optional and not committed; start from `groups.example.yml`.
 
 ```yaml
 sales:
@@ -139,7 +141,7 @@ bath:
   - Nathan Smith
 ```
 
-Names must match the sub-calendar names in Teamup exactly. Run `python -m team_pulse subcalendars` to list them.
+Names must match the sub-calendar names in Teamup (case doesn't matter). Run `python -m team_pulse subcalendars` to list them.
 
 ## How it works
 
@@ -156,15 +158,15 @@ The tool calls Teamup's REST API directly:
 
 Every request carries the `Teamup-Token` header, and sends `Authorization: Bearer …` too if `TEAMUP_BEARER_TOKEN` is set. Only `GET` requests are used.
 
-Date range, sub-calendar, and keyword filters go to Teamup with the request. The rest (`--min-days`, `--field`, `--include-all-day`) are applied here after the events come back.
+Date range, sub-calendar, and keyword filters go to Teamup with the request. The rest (`--min-days`, `--field`, `--include-all-day`) are applied here after the events come back. A `--who` that doesn't match a sub-calendar name is matched against each event's "who" field instead.
 
 **Custom fields:** an event stores custom values under each field's internal id, and choice fields store option ids, not the names you see in Teamup. The tool reads the field definitions from the `configuration` response and translates names to ids, so `--field "Reason=Vacation"` works. If a field or option is renamed in Teamup, the id stays the same and the filter keeps working.
 
 **Recurring events:** the events endpoint evaluates recurrence rules and returns each instance inside the date range, so a weekly day off shows up as separate events. Nothing here needs to expand them.
 
-**Multi-day events:** a Monday-to-Friday absence arrives as one event, and the tool splits it into days before counting totals, coverage, and overlaps.
+**Multi-day events:** a Monday-to-Friday absence arrives as one event, and the tool splits it into days before counting totals, coverage, and overlaps. Days outside the requested range aren't counted, and a timed event (a two-hour appointment) counts as a day out.
 
-**Changes:** the `modifiedSince` response includes deleted events (their `delete_dt` is set) and returns only the master event for a recurring series, not each instance. Teamup keeps at most 30 days of change history. The response carries a `timestamp`, which the tool saves and uses as the next `--since` so nothing is missed between runs.
+**Changes:** the `modifiedSince` response includes deleted events (their `delete_dt` is set) and returns only the master event for a recurring series, not each instance. Teamup keeps at most 30 days of change history. The response carries a `timestamp`, which the tool saves to `.team_pulse_state.json` and uses as the next `--since` so nothing is missed between runs.
 
 ### Search syntax
 
@@ -177,15 +179,25 @@ Official reference: <https://apidocs.teamup.com>
 ```
 team-pulse/
 ├── team_pulse/
+│   ├── config.py        # Settings from .env
 │   ├── client.py        # Teamup API calls (GET only)
+│   ├── models.py        # Event parsing and day splitting
 │   ├── filters.py       # Filter parsing and local filtering
 │   ├── reports.py       # out, coverage, totals, overlaps, changes, raw
 │   ├── output.py        # table, CSV, JSON writers
 │   └── cli.py           # Command-line entry point
-├── groups.yml           # Your named sub-calendar groups
+├── groups.example.yml   # Copy to groups.yml for your named sub-calendar groups
 ├── .env.example
 ├── requirements.txt
+├── requirements-dev.txt
 └── tests/
+```
+
+Run the tests with:
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
 ```
 
 ## Not covered
@@ -194,13 +206,14 @@ Teamup's OpenAPI spec has data models for webhook notifications and an activity 
 
 ## Roadmap
 
-- [ ] Client, auth, and `check` command
-- [ ] Date-range and sub-calendar filters
-- [ ] `out` and `raw` reports
-- [ ] `totals`, `coverage`, and `overlaps` reports
-- [ ] `changes` report using `modifiedSince`
-- [ ] CSV and JSON export
-- [ ] Local filters and `groups.yml`
+- [x] Client, auth, and `check` command
+- [x] Date-range and sub-calendar filters
+- [x] `out` and `raw` reports
+- [x] `totals`, `coverage`, and `overlaps` reports
+- [x] `changes` report using `modifiedSince`
+- [x] CSV and JSON export
+- [x] Local filters and `groups.yml`
+- [ ] Verify against a live calendar: custom field layout in `configuration`, all-day end times, search paging
 - [ ] Weekly digest: a scheduled run that emails or posts "who's out this week"
 - [ ] Time-off balances, if allowances can be stored somewhere
 

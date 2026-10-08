@@ -1,0 +1,8 @@
+# Copy to groups.yml and edit. Names must match Teamup sub-calendar names exactly.
+# Run `python -m team_pulse subcalendars` to list them.
+sales:
+  - Alex Example
+  - Sam Example
+bath:
+  - Alex Example
+  - Jordan Example
