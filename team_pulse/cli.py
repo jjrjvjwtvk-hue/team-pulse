@@ -16,12 +16,14 @@ from .config import ConfigError, load_settings
 from .filters import (
     PRESETS,
     FilterError,
+    TIME_OFF_WORDS,
     LocalFilters,
     field_definitions,
     load_groups,
     parse_field_filters,
     resolve_range,
     resolve_subcalendars,
+    title_pattern,
 )
 from .models import Event
 
@@ -46,6 +48,10 @@ def build_parser() -> argparse.ArgumentParser:
     rep.add_argument("--group", action="append", default=[], help="Group from groups.yml (repeatable)")
     rep.add_argument("--field", action="append", default=[], metavar="NAME=VALUE", help="Custom field match (repeatable)")
     rep.add_argument("--search", help="Keyword search, run by Teamup (2-100 characters)")
+    rep.add_argument("--time-off", action="store_true",
+                     help="Only events whose title has a time-off word (off, sick, pto, vacation, holiday, leave)")
+    rep.add_argument("--title-match", action="append", default=[], metavar="WORD",
+                     help="Only events whose title has this whole word; replaces the --time-off list (repeatable)")
     rep.add_argument("--min-days", type=int, help="Only absences of at least N days")
     all_day = rep.add_mutually_exclusive_group()
     all_day.add_argument("--include-all-day", dest="all_day", action="store_const", const=True,
@@ -153,7 +159,12 @@ def cmd_report(args, client: TeamupClient, tz: str | None, today: date) -> str:
         field_names = {d.id: d.name for d in defs}
         field_matches = parse_field_filters(args.field, defs)
 
+    title = None
+    if args.title_match or args.time_off:
+        title = title_pattern(args.title_match or TIME_OFF_WORDS)
+
     local = LocalFilters(
+        title=title,
         who_text=who_text,
         fields=field_matches,
         min_days=args.min_days,

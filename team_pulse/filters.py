@@ -197,8 +197,17 @@ def _strip_html(s: str) -> str:
 
 # --- Local filtering ---------------------------------------------------------
 
+TIME_OFF_WORDS = ["off", "sick", "pto", "vacation", "holiday", "leave"]
+
+
+def title_pattern(words: list[str]) -> re.Pattern:
+    """Whole-word, case-insensitive match for any of the given words."""
+    return re.compile(r"\b(?:" + "|".join(re.escape(w.strip()) for w in words if w.strip()) + r")\b", re.I)
+
+
 @dataclass
 class LocalFilters:
+    title: re.Pattern | None = None
     who_text: list[str] = field(default_factory=list)
     fields: list[FieldMatch] = field(default_factory=list)
     min_days: int | None = None
@@ -206,6 +215,8 @@ class LocalFilters:
     include_weekends: bool = False
 
     def matches(self, event: Event) -> bool:
+        if self.title is not None and not self.title.search(event.title):
+            return False
         if self.all_day is not None and event.all_day != self.all_day:
             return False
         if self.min_days is not None and len(event.days(self.include_weekends)) < self.min_days:

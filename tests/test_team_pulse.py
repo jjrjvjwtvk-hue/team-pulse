@@ -336,3 +336,13 @@ def test_field_definitions_accepts_live_nested_shape():
     defs = field_definitions(cfg)
     assert [d.name for d in defs] == ["Kind"]
     assert defs[0].choices == {"vacation": "1"}
+
+
+def test_title_pattern_matches_whole_words_only():
+    from team_pulse.filters import TIME_OFF_WORDS, title_pattern
+    p = title_pattern(TIME_OFF_WORDS)
+    for yes in ["OFF — Tom", "Off", "SICK", "Day off", "PTO"]:
+        assert p.search(yes), yes
+    for no in ["Nothing after 1", "Outdoor Meeting", "Offsite", "1 Lead only"]:
+        assert not p.search(no), no
+    assert title_pattern(["sick"]).search("Sick day") and not title_pattern(["sick"]).search("OFF")

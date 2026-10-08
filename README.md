@@ -95,6 +95,8 @@ Filters combine. An event has to match all of them to appear.
 | `--group` | `--group bath` | A named set of sub-calendars defined in `groups.yml` |
 | `--field` | `--field "Reason=Vacation"` | Match a custom event field by its display name and value (repeatable). Run `team_pulse fields` to list them |
 | `--search` | `--search "dentist"` | Keyword search, 2 to 100 characters. Teamup runs the search, see [Search syntax](#search-syntax) |
+| `--time-off` | | Only events whose title contains a time-off word: off, sick, pto, vacation, holiday, or leave (whole words, any case). Filters out meetings and "Nothing after 1" entries |
+| `--title-match` | `--title-match sick` | Like `--time-off` with your own words (repeatable). Replaces the default list |
 | `--min-days` | `--min-days 3` | Only absences of at least N days |
 | `--include-all-day / --exclude-all-day` | | Limit to all-day or timed events |
 | `--include-weekends` | | Count Saturdays and Sundays as days off. By default only weekdays are counted |
@@ -180,7 +182,7 @@ The tool calls Teamup's REST API directly:
 
 Every request carries the `Teamup-Token` header, and sends `Authorization: Bearer …` too if `TEAMUP_BEARER_TOKEN` is set. Only `GET` requests are used.
 
-Date range, sub-calendar, and keyword filters go to Teamup with the request. The rest (`--min-days`, `--field`, `--include-all-day`) are applied here after the events come back. A `--who` that doesn't match a sub-calendar name is matched against each event's "who" field instead.
+Date range, sub-calendar, and keyword filters go to Teamup with the request. The rest (`--time-off`, `--title-match`, `--min-days`, `--field`, `--include-all-day`) are applied here after the events come back. A `--who` that doesn't match a sub-calendar name is matched against each event's "who" field instead.
 
 **Custom fields:** an event stores custom values under each field's internal id, and choice fields store option ids, not the names you see in Teamup. The tool reads the field definitions from the `configuration` response and translates names to ids, so `--field "Reason=Vacation"` works. If a field or option is renamed in Teamup, the id stays the same and the filter keeps working.
 
@@ -238,7 +240,7 @@ Teamup's OpenAPI spec has data models for webhook notifications and an activity 
 - [x] `board` report and HTML export
 - [x] Local filters and `groups.yml`
 - [x] Verify against a live calendar: credentials, all-day end times, search paging, and the custom field layout (fixed: the API nests fields under `fields.definitions`). This calendar defines no custom fields, so `--field` is untested live
-- [ ] Separate time off from meetings and partial-day entries ("Nothing after 1", "Outdoor Meeting") so `out` and `totals` stop counting them
+- [x] Separate time off from meetings and partial-day entries with `--time-off` / `--title-match`. It's opt-in, since it depends on how your team titles events
 - [ ] Weekly digest: a scheduled run that emails or posts "who's out this week"
 - [ ] Time-off balances, if allowances can be stored somewhere
 
