@@ -185,7 +185,7 @@ def cmd_report(args, client: TeamupClient, tz: str | None, today: date) -> str:
     heading = reports.HEADINGS[args.kind]
     if args.kind == "board":
         if args.format == "html":
-            return html.render_board(events, ctx, heading, people)
+            return html.render_board(events, ctx, heading, people, today)
         return output.render(reports.board_report(events, ctx, people, marks=args.format == "table"), args.format)
 
     builders = {

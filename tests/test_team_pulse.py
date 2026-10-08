@@ -297,3 +297,14 @@ def test_board_html_empty(capsys):
 def test_other_reports_render_as_html_table(capsys):
     _, out, _ = run(capsys, "report", "totals", "--preset", "next-week", "--format", "html")
     assert "<h1>Days off</h1>" in out and '<td class="num">5</td>' in out
+
+
+def test_board_html_details_and_accessibility(capsys):
+    _, out, _ = run(capsys, "report", "board", "--from", "2026-10-05", "--to", "2026-10-16", "--format", "html")
+    # Full text for every absence, since strips can be too narrow to label
+    assert "<h2>Details</h2>" in out and "Mon 12 Oct – Fri 16 Oct" in out and "Thu 15 Oct<br>14:00–15:00" in out
+    # Today (8 Oct) is marked, using the report's date rather than the machine clock
+    assert '<span class="month">Today</span>' in out
+    # Screen readers get who and when for each strip; the grid can be scrolled by keyboard
+    assert '<span class="sr">Alex Example: </span>' in out
+    assert 'tabindex="0" role="region"' in out
