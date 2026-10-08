@@ -256,3 +256,44 @@ def test_client_error_message():
     session = FakeSession([FakeResponse(401, {"error": {"message": "Invalid token"}})])
     with pytest.raises(TeamupError, match="Invalid token.*TEAMUP_API_KEY"):
         TeamupClient(SETTINGS, session).subcalendars()
+
+
+# --- board and HTML ----------------------------------------------------------
+
+def test_board_terminal_marks(capsys):
+    _, out, _ = run(capsys, "report", "board", "--preset", "next-week")
+    lines = out.splitlines()
+    assert lines[0].split()[:3] == ["person", "Mon", "12"]
+    assert "██" in next(l for l in lines if l.startswith("Alex Example"))
+    assert "▒▒" in next(l for l in lines if l.startswith("Jordan Example"))
+
+
+def test_board_json_uses_titles_and_lists_selected_people(capsys):
+    _, out, _ = run(capsys, "report", "board", "--preset", "next-week", "--group", "sales", "--format", "json")
+    rows = {r["person"]: r for r in json.loads(out)}
+    assert set(rows) == {"Alex Example", "Sam Example"}
+    assert rows["Sam Example"]["2026-10-14"] == "Dentist"
+
+
+def test_board_html(capsys):
+    _, out, _ = run(capsys, "report", "board", "--preset", "next-week", "--format", "html")
+    assert out.startswith("<!doctype html>")
+    assert "12–18 Oct 2026" in out
+    assert out.count('class="tape"') == 2 and out.count('class="tape part"') == 1
+    assert 'class="count busy">2<' in out  # Wed and Thu are the busiest days
+
+
+def test_board_html_escapes_titles(capsys):
+    client = FakeClient(events=[ev("x", 1, "2026-10-12T00:00:00", "2026-10-12T23:59:00", "<b>Off</b>")])
+    _, out, _ = run(capsys, "report", "board", "--preset", "next-week", "--format", "html", client=client)
+    assert "<b>Off</b>" not in out and "&lt;b&gt;Off&lt;/b&gt;" in out
+
+
+def test_board_html_empty(capsys):
+    _, out, _ = run(capsys, "report", "board", "--preset", "next-week", "--format", "html", client=FakeClient(events=[]))
+    assert "No time off between 12 Oct 2026 and 18 Oct 2026." in out
+
+
+def test_other_reports_render_as_html_table(capsys):
+    _, out, _ = run(capsys, "report", "totals", "--preset", "next-week", "--format", "html")
+    assert "<h1>Days off</h1>" in out and '<td class="num">5</td>' in out

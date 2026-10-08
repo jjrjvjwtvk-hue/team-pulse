@@ -8,7 +8,7 @@ import json
 
 from .reports import Report
 
-FORMATS = ("table", "csv", "json")
+FORMATS = ("table", "csv", "json", "html")
 MAX_CELL = 60
 
 

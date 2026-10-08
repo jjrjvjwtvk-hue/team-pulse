@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import output, reports
+from . import html, output, reports
 from .client import TeamupClient, TeamupError
 from .config import ConfigError, load_settings
 from .filters import (
@@ -181,6 +181,13 @@ def cmd_report(args, client: TeamupClient, tz: str | None, today: date) -> str:
         groups=report_groups,
         field_names=field_names,
     )
+    people = [ctx.subcalendar_names[i] for i in selected_ids if i in ctx.subcalendar_names]
+    heading = reports.HEADINGS[args.kind]
+    if args.kind == "board":
+        if args.format == "html":
+            return html.render_board(events, ctx, heading, people)
+        return output.render(reports.board_report(events, ctx, people, marks=args.format == "table"), args.format)
+
     builders = {
         "out": reports.out_report,
         "coverage": reports.coverage_report,
@@ -188,7 +195,10 @@ def cmd_report(args, client: TeamupClient, tz: str | None, today: date) -> str:
         "overlaps": reports.overlaps_report,
         "raw": reports.raw_report,
     }
-    return output.render(builders[args.kind](events, ctx), args.format)
+    report = builders[args.kind](events, ctx)
+    if args.format == "html":
+        return html.render_table(report, ctx, heading)
+    return output.render(report, args.format)
 
 
 def _changes(args, client, tz, today, subcalendars, selected_ids, local) -> str:
@@ -213,13 +223,16 @@ def _changes(args, client, tz, today, subcalendars, selected_ids, local) -> str:
 
     since_dt = datetime.fromtimestamp(since_ts, now.tzinfo).replace(tzinfo=None)
     ctx = reports.Context(
-        start=today,
+        start=since_dt.date(),
         end=today,
         subcalendar_names={int(s["id"]): s["name"] for s in subcalendars},
         selected_ids=selected_ids,
         include_weekends=args.include_weekends,
     )
-    return output.render(reports.changes_report(events, ctx, since_dt), args.format)
+    report = reports.changes_report(events, ctx, since_dt)
+    if args.format == "html":
+        return html.render_table(report, ctx, reports.HEADINGS["changes"])
+    return output.render(report, args.format)
 
 
 def parse_since(value: str, now: datetime) -> int:

@@ -8,7 +8,11 @@ from datetime import date, datetime, timedelta
 
 from .models import Event
 
-REPORTS = ("out", "coverage", "totals", "overlaps", "changes", "raw")
+REPORTS = ("board", "out", "coverage", "totals", "overlaps", "changes", "raw")
+HEADINGS = {
+    "board": "Who's out", "out": "Who's out", "coverage": "Coverage", "totals": "Days off",
+    "overlaps": "Overlaps", "changes": "Calendar changes", "raw": "Events",
+}
 
 
 @dataclass
@@ -57,6 +61,29 @@ def out_report(events: list[Event], ctx: Context) -> Report:
                          len(e.days(ctx.include_weekends)), _when(e), e.title])
     rows.sort(key=lambda r: (r[1], r[0]))
     return Report(["person", "start", "end", "days", "time", "title"], rows)
+
+
+def board_report(events: list[Event], ctx: Context, people: list[str] | None = None, marks: bool = False) -> Report:
+    """Person x day grid. With marks, cells are block characters for a terminal; otherwise event titles."""
+    days = ctx.all_days()
+    cells: dict[str, dict[date, list[Event]]] = {p: {} for p in (people or [])}
+    for e in _sorted(events):
+        for d in ctx.days_in_range(e):
+            for person in ctx.people(e):
+                cells.setdefault(person, {}).setdefault(d, []).append(e)
+
+    rows = []
+    for person in sorted(cells, key=str.casefold):
+        row = [person]
+        for d in days:
+            evs = cells[person].get(d, [])
+            if marks:
+                row.append("" if not evs else ("██" if any(e.all_day for e in evs) else "▒▒"))
+            else:
+                row.append("; ".join(e.title or "Time off" for e in evs))
+        rows.append(row)
+    labels = [d.strftime("%a %d") if marks else d.isoformat() for d in days]
+    return Report(["person", *labels], rows)
 
 
 def coverage_report(events: list[Event], ctx: Context) -> Report:

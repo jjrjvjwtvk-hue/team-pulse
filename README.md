@@ -12,7 +12,7 @@ My team logs time off in a Teamup calendar. This repo turns that calendar into a
 - Filters by date range, sub-calendar (person, team, or division), keyword, and custom fields
 - Shows what changed recently, so you can see new and cancelled time off without rereading the calendar
 - Rolls events up into the reports you'd actually look at
-- Exports to the terminal, CSV, or JSON
+- Exports to the terminal, CSV, JSON, or a standalone HTML page
 - Read-only. It never creates, edits, or deletes calendar events
 
 ## Requirements
@@ -65,7 +65,7 @@ python -m team_pulse check
 ## Usage
 
 ```bash
-python -m team_pulse report [filters] [--format table|csv|json] [--out FILE]
+python -m team_pulse report [filters] [--format table|csv|json|html] [--out FILE]
 ```
 
 ### Filters
@@ -88,6 +88,7 @@ Filters combine. An event has to match all of them to appear.
 
 | Report | Command | What you get |
 |---|---|---|
+| Board | `report board` | A person-by-day grid of who's out. In the terminal it's a block chart; as HTML it's a wall-planner page with each absence drawn across its days and the busiest days flagged |
 | Who's out | `report out` | Everyone off during the range, with dates |
 | Coverage | `report coverage` | Headcount out per day, so you can see thin days at a glance |
 | Totals | `report totals` | Days off per person for the range |
@@ -96,6 +97,12 @@ Filters combine. An event has to match all of them to appear.
 | Raw | `report raw` | Every matching event, unaggregated |
 
 ### Examples
+
+A page showing who's out over the next 30 days, to open in a browser, print, or email:
+
+```bash
+python -m team_pulse report board --preset next-30-days --format html --out board.html
+```
 
 Who's out next week?
 
@@ -185,6 +192,7 @@ team-pulse/
 │   ├── filters.py       # Filter parsing and local filtering
 │   ├── reports.py       # out, coverage, totals, overlaps, changes, raw
 │   ├── output.py        # table, CSV, JSON writers
+│   ├── html.py          # HTML pages: the board and styled tables
 │   └── cli.py           # Command-line entry point
 ├── groups.example.yml   # Copy to groups.yml for your named sub-calendar groups
 ├── .env.example
@@ -212,6 +220,7 @@ Teamup's OpenAPI spec has data models for webhook notifications and an activity 
 - [x] `totals`, `coverage`, and `overlaps` reports
 - [x] `changes` report using `modifiedSince`
 - [x] CSV and JSON export
+- [x] `board` report and HTML export
 - [x] Local filters and `groups.yml`
 - [ ] Verify against a live calendar: custom field layout in `configuration`, all-day end times, search paging
 - [ ] Weekly digest: a scheduled run that emails or posts "who's out this week"
