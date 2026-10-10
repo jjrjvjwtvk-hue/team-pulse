@@ -53,8 +53,6 @@ def build_parser() -> argparse.ArgumentParser:
                      help="Top-level group from the sub-calendar name, e.g. Bathrooms (repeatable)")
     rep.add_argument("--threshold", type=float, metavar="PCT",
                      help="For the block reports: flag any group-block with more than PCT%% of reps' time off")
-    rep.add_argument("--any-title", action="store_true",
-                     help="For the block reports: count every event, not just time-off titles")
     rep.add_argument("--search", help="Keyword search, run by Teamup (2-100 characters)")
     rep.add_argument("--time-off", action="store_true",
                      help="Only events whose title has a time-off word (off, sick, pto, vacation, holiday, leave)")
@@ -117,6 +115,16 @@ def cmd_check(client: TeamupClient) -> str:
     history = _find_history_setting(config)
     if history:
         lines.append(f"History: {history}")
+    cal_tz = (config.get("date_time") or {}).get("tz")
+    mine = client.settings.timezone
+    if cal_tz and mine and mine != cal_tz:
+        lines.append(
+            f"WARNING: the calendar's time zone is {cal_tz} but TEAMUP_TIMEZONE is {mine}. Event times will be "
+            f"shifted, which throws off the time-block reports if your team types plain clock times. "
+            f"Set TEAMUP_TIMEZONE={cal_tz} or remove it."
+        )
+    elif cal_tz:
+        lines.append(f"Time zone: {cal_tz}")
     active = [s for s in subs if s.get("active", True)]
     lines.append(f"Sub-calendars visible to this key: {len(subs)} ({len(active)} active)")
     lines += [f"  - {s['name']}" for s in sorted(subs, key=lambda s: s["name"].casefold())]
@@ -178,8 +186,7 @@ def cmd_report(args, client: TeamupClient, tz: str | None, today: date) -> str:
         field_matches = parse_field_filters(args.field, defs)
 
     title = None
-    block_report = args.kind in ("blocks", "people-blocks")
-    if args.title_match or args.time_off or (block_report and not args.any_title):
+    if args.title_match or args.time_off:
         title = title_pattern(args.title_match or TIME_OFF_WORDS)
 
     local = LocalFilters(

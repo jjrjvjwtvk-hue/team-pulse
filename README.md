@@ -42,7 +42,7 @@ Settings live in `.env` (never committed; it's in `.gitignore`).
 |---|---|---|
 | `TEAMUP_API_KEY` | Yes, unless a network secret supplies it | Sent with every request in the `Teamup-Token` header |
 | `TEAMUP_CALENDAR_KEY` | Yes | The calendar key or ID that appears in the API path |
-| `TEAMUP_TIMEZONE` | No | IANA time zone for returned dates, e.g. `America/Chicago`. Defaults to the calendar's own setting |
+| `TEAMUP_TIMEZONE` | No | IANA time zone for returned dates, e.g. `America/Chicago`. Defaults to the calendar's own setting. If your team types plain clock times ("Nothing after 10:00 AM" stored as 10:00), set this to the calendar's own zone or leave it unset, or every time shifts. `team_pulse check` warns when they differ |
 | `TEAMUP_BASE_URL` | No | Defaults to `https://api.teamup.com` |
 | `TEAMUP_BEARER_TOKEN` | No | Only needed if your calendar key can't see everything you want. See below |
 
@@ -99,7 +99,6 @@ Filters combine. An event has to match all of them to appear.
 | `--title-match` | `--title-match sick` | Like `--time-off` with your own words (repeatable). Replaces the default list |
 | `--parent` | `--parent Bathrooms` | Limit to one top-level group, taken from the sub-calendar name (`Bathrooms > Ed Wright` is in `Bathrooms`). Repeatable |
 | `--threshold` | `--threshold 25` | Block reports only: mark rows `OVER` when more than this percentage of the group is off |
-| `--any-title` | | Block reports only: count every event instead of just time-off titles |
 | `--min-days` | `--min-days 3` | Only absences of at least N days |
 | `--include-all-day / --exclude-all-day` | | Limit to all-day or timed events |
 | `--include-weekends` | | Count Saturdays and Sundays as days off. By default only weekdays are counted |
@@ -132,7 +131,7 @@ Sunday has no blocks. Blocks run back to back with no gap, so 12:30 belongs to B
 - A rep's percentage for a block is the share of the block's minutes covered by their events. An all-day event covers every block that day. Overlapping events for the same rep are merged, so nothing is counted twice.
 - A group's percentage is the average across its reps: two of four reps off for a whole block is 50%. The headcount is every active sub-calendar in the group, or only those you selected with `--who` / `--parent`.
 - Groups come from the sub-calendar name before the ` > `.
-- Block reports count only time-off titles (see `--time-off`) unless you pass `--title-match` or `--any-title`. Otherwise a meeting during a block would count as time off.
+- Every event counts as time off. If your calendar also holds other things, narrow it with `--time-off` or `--title-match`.
 - Only rows with some time off are listed. A day missing from the report means nobody was off.
 - `--threshold` doesn't have a default yet. Without it the `flag` column stays empty.
 
